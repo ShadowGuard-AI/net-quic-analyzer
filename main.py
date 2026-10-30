@@ -2,6 +2,7 @@ import socket
 import argparse
 import logging
 import sys
+from contextlib import nullcontext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -55,7 +56,7 @@ def capture_quic_traffic(interface, port, output_file, bpf_filter=None):
             logging.info(f"Using BPF Filter: {bpf_filter}")
 
 
-        with open(output_file, 'wb') as outfile if output_file else sys.stdout as outfile:  # Use stdout if no file provided
+        with (open(output_file, 'wb') if output_file else nullcontext(sys.stdout)) as outfile:  # Use stdout if no file provided
             while True:
                 packet, addr = sock.recvfrom(65535)  # Receive up to 65535 bytes
 
