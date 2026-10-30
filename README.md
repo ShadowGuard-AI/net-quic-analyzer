@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # net-quic-analyzer
 Captures and analyzes QUIC protocol handshakes and streams. Provides visibility into QUIC connections, including version negotiation, stream multiplexing, and encryption parameters. Helps identify QUIC-based applications and potential security issues. - Focused on Basic network operations
 
