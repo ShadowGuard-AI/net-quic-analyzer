@@ -34,12 +34,20 @@ def capture_quic_traffic(interface, port, output_file, bpf_filter=None):
     """
     try:
         # Create a raw socket
+        # AF_PACKET hands me whole link layer frames. The first byte I test
+        # below is an Ethernet or IP header byte, not a QUIC header byte, and
+        # the port argument is never used to filter anything: it is validated
+        # in main and then ignored. This capture is a rough sieve, not a
+        # QUIC dissector, and I keep that limitation visible.
         sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3)) # 3 for all protocol
         sock.bind((interface, 0))
 
         # Apply BPF filter if provided
         if bpf_filter:
             try:
+                 # There is no widely shipped bpf module behind this import. On most
+                 # hosts a supplied filter exits here with the install message, and
+                 # the unfiltered capture is never offered as a fallback.
                  import bpf # Import bpf module only if filter specified. Prevent dependency issues.
                  sock.setsockopt(socket.SOL_SOCKET, socket.SO_ATTACH_FILTER, bpf.compile_string(bpf_filter))
 
@@ -56,11 +64,19 @@ def capture_quic_traffic(interface, port, output_file, bpf_filter=None):
             logging.info(f"Using BPF Filter: {bpf_filter}")
 
 
+        # File output is raw frames written back to back with no pcap global
+        # header and no per packet records, so Wireshark cannot open the
+        # result as a capture. The stdout branch writes hex text instead,
+        # which is why its UnicodeDecodeError guard can never fire: hex of
+        # bytes is always plain ASCII.
         with (open(output_file, 'wb') if output_file else nullcontext(sys.stdout)) as outfile:  # Use stdout if no file provided
             while True:
                 packet, addr = sock.recvfrom(65535)  # Receive up to 65535 bytes
 
                 # Basic check for QUIC - look for QUIC common header (e.g., Version Negotiation packet)
+                # This test passes unless both top bits are set, so nearly every
+                # frame counts as potential QUIC. I would rather over collect here
+                # than pretend a one byte test can identify QUIC.
                 if len(packet) > 0 and (packet[0] & 0x80 == 0 or packet[0] & 0x40 == 0): # Simplified initial QUIC detection. Needs further refinement
                     logging.debug("Potential QUIC packet received.")
                     try:
